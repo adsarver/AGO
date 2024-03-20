@@ -1,0 +1,30 @@
+Use by doing log.'level' (e.g. log.info('message')) or log.log('level', 'message')
+
+TRACE (600): this is the least severe log level,
+             typically used to log fine-grained
+             information about a program's execution
+             such as entering or exiting functions,
+             and variable values, and other low-level
+             details that can help in understanding the
+             internal workings of your code.
+DEBUG (500): it is used for logging messages intended
+             to be helpful during the development and
+             testing process,which is usually program
+             state information that can be helpful when
+             ascertaining whether an operation is being
+             performed correctly.
+INFO (400): it is used for informational messages that
+            record events that occur during the normal
+            operation of your application, such as user
+            authentication, API calls, or database access.
+            These messages help you understand what's
+            happening within your application.
+WARN (300): events logged at this level indicate potential
+            issues that might require your attention before
+            they become significant problems.
+ERROR (200): it is used to record unexpected errors that
+             occur during the course of program execution.
+FATAL (100): this is the most severe log level, and it
+             indicates an urgent situation affecting your
+             application's core component that should be
+             addressed immediately.
