@@ -36,3 +36,9 @@ build/
 
 ### Mac OS ###
 .DS_Store
+
+### Dataset ###
+src/main/python/training/dataset/
+
+### Python ###
+src/main/python/training/__pycache__/
