@@ -7,17 +7,7 @@ from numpy.random import permutation
 import sys
 os.chdir(sys.argv[1])
 
-parent = 'exterior'
-
-if not os.path.isdir(os.path.join(Path(os.getcwd()), parent)):
-    os.mkdir(os.path.join(Path(os.getcwd()), parent))
-
-newfolder = 'exterior/test'
-
-if not os.path.isdir(os.path.join(Path(os.getcwd()), newfolder)):
-    os.mkdir(os.path.join(Path(os.getcwd()), newfolder))
-    
-newfolder = 'exterior/train'
+newfolder = 'exterior'
 
 if not os.path.isdir(os.path.join(Path(os.getcwd()), newfolder)):
     os.mkdir(os.path.join(Path(os.getcwd()), newfolder))
@@ -49,23 +39,17 @@ def crop(filename, w, h):
 
 
 print('%s started running.' % os.path.basename(__file__))
-i = permutation(os.listdir(os.path.join(os.getcwd(), 'pictures'))).size
 
 for pic in permutation(os.listdir(os.path.join(os.getcwd(), 'pictures'))):
     im = crop(os.path.join(Path(os.getcwd()), 'pictures', pic), 100, 60)
-    
-    i = i-1
-    
+        
     if np.all([
         np.greater(np.mean(im), 80),
         np.greater(np.std(im), 62),
         np.greater(np.median(im), 60),
         np.greater(np.quantile(im, .8), 125)
     ]):
-        if i % 2 == 0:
-            newfolder = 'exterior/test'
-        else:
-            newfolder = 'exterior/train'
+        
         copy(os.path.join(Path(os.getcwd()), 'pictures', pic),
                 os.path.join(Path(os.getcwd()), newfolder))
 print('%s finished running.' % os.path.basename(__file__))

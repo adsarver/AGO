@@ -7,6 +7,7 @@ from string import ascii_letters
 from numpy.random import choice
 from pathlib import Path
 import sys
+import datetime
 
 char = list(ascii_letters)
 
@@ -24,7 +25,6 @@ os.chdir('pictures/')
 
 def get_pic(link, name):
     try:
-        print(link)
         r = requests.get(link, timeout=10)
         im = Image.open(BytesIO(r.content))
         im.save(name + '_{}.jpg'.format(''.join(choice(char, 3))))
@@ -34,6 +34,11 @@ def get_pic(link, name):
 
 if __name__ == '__main__':
     print('%s started running.' % os.path.basename(__file__))
+    avg = []
     for _, (tag, url) in df.iterrows():
+        time = int(datetime.datetime.now().timestamp())
         get_pic(link=url, name=tag)
+        time.append(int(datetime.datetime.now().timestamp()) - time)
+        print('Avg download time {}', avg.sum() / len(avg))
+        
     print('%s finished running.' % os.path.basename(__file__))
