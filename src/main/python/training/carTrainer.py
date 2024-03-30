@@ -10,26 +10,24 @@ from sklearn.datasets import make_classification
 from sklearn.model_selection import train_test_split
 
 # prepare data
-input_dir = os.path.join(os.getcwd(), 'dataset', 'picturesTest')
+input_dir = os.path.join(os.getcwd(), 'dataset', 'pictures')
 categories = ['Make', 'Model', 'Year']
+data = []
+labels = []
+for file in os.listdir(input_dir)[0:9]:
+    img_path = os.path.join(input_dir, file)
+    img = imread(img_path)
+    img = resize(img, (30, 30))
+    data.append(img)
+    curLabel = file[:-8]
+    labels.append(curLabel)
 
-data = np.matrix()
-for category_idx, category in enumerate(categories): # for every category, iterate over the files in the directory
-    print(f'Category {category}')
-    for file in os.listdir(input_dir)[0:9]:
-        img_path = os.path.join(input_dir, file)
-        img = imread(img_path)
-        img = resize(img, (30, 30))
-        data.append(img.flatten())
-        curLabel = file.split('_')
-        data.put(curLabel, img.flatten())
-    
+data = np.array([image.flatten() for image in data])
+labels = np.array(labels)
 
 print('Imported')
-print('Data: ', data.shape)
-print('Converted')
 # train / test split
-x_train, x_test, y_train, y_test = train_test_split(data, test_size=0.2, shuffle=True, stratify=labels)
+x_train, x_test, y_train, y_test = train_test_split(data, labels, test_size=0.2, shuffle=True, stratify=labels)
 print('Split')
 # train classifier
 # classifier = SVC()

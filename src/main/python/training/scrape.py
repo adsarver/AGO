@@ -32,7 +32,7 @@ def make_menu(listed):
 
 def model_menu(listed):
     model_menu_list = []
-    for make in listed[0:9]:
+    for make in listed[0:10]:
         soup = fetch(website, make)
         for div in soup.find_all("div", {"class": "year-selector"}):
             for link in div.find_all("a"):

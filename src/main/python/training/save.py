@@ -38,7 +38,7 @@ if __name__ == '__main__':
     for _, (tag, url) in df.iterrows():
         time = int(datetime.datetime.now().timestamp())
         get_pic(link=url, name=tag)
-        avg.append(int(datetime.datetime.now().timestamp()) - time)
+        avg.append(int(datetime.datetime.now().timestamp()) - time) 
         print('Avg download time: ', sum(avg) / len(avg))
         
     print('%s finished running.' % os.path.basename(__file__))
