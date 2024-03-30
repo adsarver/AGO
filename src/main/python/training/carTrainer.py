@@ -22,21 +22,16 @@ for file in os.listdir(input_dir)[0:9]:
     curLabel = file[:-8]
     labels.append(curLabel)
 
+# format data
 data = np.array([image.flatten() for image in data])
 labels = np.array(labels)
 
-print('Imported')
 # train / test split
 x_train, x_test, y_train, y_test = train_test_split(data, labels, test_size=0.2, shuffle=True, stratify=labels)
-print('Split')
-# train classifier
-# classifier = SVC()
 
-# parameters = [{'gamma': [0.01, 0.001, 0.0001], 'C': [1, 10, 100, 1000]}]
-print('Training')
+# classifier
 MLP = MLPClassifier(verbose=True, alpha=1e-5, random_state=1)
 MLP.fit(x_train, y_train)
-print('Trained')
 
 # test performance
 y_prediction = MLP.predict(x_test)
