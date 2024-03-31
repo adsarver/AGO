@@ -81,7 +81,7 @@ for i in range(start, len(labels), step):
     else:
         print('Training...')
         np.concatenate((test, x_test))
-        np.concatenate((test, y_test))
+        np.concatenate((base, y_test))
         MLP.partial_fit(x_train, y_train)
 
 
