@@ -34,7 +34,6 @@ input_dir = os.path.join(os.getcwd(), 'dataset', 'exterior_sml')
 data = []
 labels = []
 files = os.listdir(input_dir)
-MLP = MLPClassifier(verbose=True, alpha=0.001, activation='tanh', hidden_layer_sizes=(100,))
 x_test = []
 y_test = []
 i = 0
@@ -59,33 +58,38 @@ with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
 data = np.array(data)
 labels = np.array(labels)
 print('Data converted')
-last = 0
+
+unique, indx, counts = np.unique(labels, return_counts=True, return_index=True)
+
+
+# remove unique cars
+print('Removing unique cars')
+labels = np.delete(labels, indx[np.where(counts == 1)])
+data = np.delete(data, indx[np.where(counts == 1)], axis=0)
+print('Unique cars removed')
+
 
 test = []
 base = []
 start = 0
-step = 1000
+step = 5021
+MLP = MLPClassifier(alpha=1e-5, warm_start=True, shuffle=True, verbose=True)
 
 for i in range(start, len(labels), step):
-    print('Splitting images from ', i, 'to', i+step,'images')
+    print('Splitting images from', i, 'to', i+step,'images')
     # train / test split
-    x_train, x_test, y_train, y_test = train_test_split(data[i:i+step], labels[i:i+step], shuffle=True, test_size=0.1)
+    x_train, x_test, y_train, y_test = train_test_split(data[i:i+step], labels[i:i+step], shuffle=True, test_size=0.1, stratify=labels[i:i+step])
     print('Data split\nStarting training on', len(x_train), 'images,', len(x_test), 'images in test set')
 
     # classifier
-    if i == 0:
-        print('First training')
-        test = x_test
-        base = y_test
-        MLP.partial_fit(x_train, y_train, classes=np.unique(labels))
-    else:
-        print('Training...')
-        np.concatenate((test, x_test))
-        np.concatenate((base, y_test))
-        MLP.partial_fit(x_train, y_train)
+    print('Training...')
+    np.concatenate((test, x_test))
+    np.concatenate((base, y_test))
+    MLP.fit(x_train, y_train)
 
 
 print('Training done')
+
 
 # test performance
 y_prediction = MLP.predict(test)
