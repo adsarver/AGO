@@ -1,7 +1,7 @@
 import matplotlib
 matplotlib.use("Agg")
 from torchvision.io import read_image
-from lenet import LeNet
+from classifier import Classifier
 import concurrent.futures
 from sklearn.metrics import classification_report
 from torch.utils.data import random_split
@@ -38,8 +38,7 @@ class CustomImageDataset(Dataset):
         img_path = os.path.join(self.img_dir, self.img_labels.iloc[idx, 1])
         image = read_image(img_path)
         label = self.img_labels.iloc[idx, 1][:-8]
-        if self.transform:
-            image = self.transform(image)
+        image = self.transform(image)
 
         return image, label
 
@@ -61,7 +60,7 @@ EPOCHS = 10
 TRAIN_SPLIT = 0.75
 VAL_SPLIT = 1 - TRAIN_SPLIT
 # set the device we will be using to train the model
-device = torch.device("cuda")
+device = torch.device(0)
 
 # load the dataset
 print("[INFO] loading the dataset...")
@@ -82,7 +81,7 @@ files = os.listdir(input_dir)
 
 with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
     futures = []
-    for file in files:
+    for file in files[:100]:
         futures.append(executor.submit(getAnno, file))
     for future in concurrent.futures.as_completed(futures):
         temp = future.result()
@@ -91,13 +90,14 @@ with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
 with open('exterior_sml/$annotations.csv', 'w', newline='') as file:
     df = pd.DataFrame.from_dict(labels, orient='index')
     df.to_csv(file)
-    print('Annotations saved to file')
+    print('[INFO] annotations saved to file')
 
 trainData = CustomImageDataset('exterior_sml/$annotations.csv', input_dir, 
 	transform=transforms.Compose([
 		transforms.ToPILImage(),
-		transforms.Resize((512,640)),
-		transforms.ToTensor()
+		transforms.Resize((512,512)),
+		transforms.ToTensor(),
+  		transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
 	]))
 
 classes = trainData.classes
@@ -138,9 +138,7 @@ valSteps = len(valDataLoader.dataset)
 
 # initialize the LeNet model
 print("[INFO] initializing the LeNet model...")
-model = LeNet(
-	num_channels=3,
-	num_features=classes).to(device)
+model = Classifier().cuda()
 # initialize our optimizer and loss function
 opt = Adam(model.parameters(), lr=INIT_LR)
 lossFn = nn.NLLLoss()
