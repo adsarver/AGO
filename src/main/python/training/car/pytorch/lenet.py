@@ -1,6 +1,10 @@
 import torch.nn as nn
+from torch import flatten
+
 
 class LeNet(nn.Module):
+    # num_channels: number of channels in the input images, 1 - grayscale, 3 - RGB
+    # num_features: number of classes in the convolutional layers
     def __init__(self, num_channels, num_features):
         super(LeNet, self).__init__()
 
@@ -22,7 +26,7 @@ class LeNet(nn.Module):
         x = nn.functional.relu(x)
         x = nn.functional.max_pool2d(x, kernel_size=2, stride=2)
 
-        x = x.view(-1, num_features * 2 * 14 * 14)
+        x = flatten(x, 1)
 
         x = self.fc1(x)
         x = nn.functional.relu(x)
