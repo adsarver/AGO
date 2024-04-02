@@ -18,46 +18,42 @@ import time
 import os
 import pandas as pd
 from sklearn.preprocessing import LabelEncoder
+from pathlib import Path
 
 mlb = LabelEncoder()
-
+tempset = set()
 class CustomImageDataset(Dataset):
-    classes = 0
-    
-    def __init__(self, annotations_file, img_dir, transform=None):
-        self.img_labels = pd.read_csv(annotations_file)
-        self.img_dir = img_dir
-        self.transform = transform
-        self.classes = len(np.unique(self.img_labels.iloc[:, 1]))
-        
+	classes = 0
 
-    def __len__(self):
-        return len(self.img_labels)
+	def __init__(self, annotations_file, img_dir, transform=None):
+		self.img_labels = pd.read_csv(annotations_file)
+		self.img_dir = img_dir
+		self.transform = transform
+		for j in range(len(self.img_labels.iloc)):
+			for i in self.img_labels.iloc[j, 1]:
+				print(i[:-8])
+				tempset.add(i[:-8])
+     
+	def __len__(self):
+		return len(self.img_labels)
 
-    def __getitem__(self, idx):
-        img_path = os.path.join(self.img_dir, self.img_labels.iloc[idx, 1])
-        image = read_image(img_path)
-        label = self.img_labels.iloc[idx, 1][:-8]
-        image = self.transform(image)
+	def __getitem__(self, idx):
+		img_path = os.path.join(self.img_dir, self.img_labels.iloc[idx, 1])
+		image = read_image(img_path)
+		label = self.img_labels.iloc[idx, 1][:-8]
+		tempset.add(label)
+		image = self.transform(image)
 
-        return image, label
+		return image, label
 
-
-ap = argparse.ArgumentParser()
-ap.add_argument("-m", "--model", type=str, required=True,
-	help="path to output trained model")
-ap.add_argument("-p", "--plot", type=str, required=True,
-	help="path to output loss/accuracy plot")
-args = vars(ap.parse_args())
-
-# MAX THREADS -- Change this to the number of workers you want to use
+# MAX THREADS -- Change this to the number of workers you want to use for importing the dataset
 MAX_WORKERS = 12
 # define training hyperparameters
 INIT_LR = 1e-3
 BATCH_SIZE = 64
-EPOCHS = 10
+EPOCHS = 300
 # define the train and val splits
-TRAIN_SPLIT = 0.75
+TRAIN_SPLIT = 0.9
 VAL_SPLIT = 1 - TRAIN_SPLIT
 # set the device we will be using to train the model
 device = torch.device(0)
@@ -81,7 +77,7 @@ files = os.listdir(input_dir)
 
 with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
     futures = []
-    for file in files[:100]:
+    for file in files:
         futures.append(executor.submit(getAnno, file))
     for future in concurrent.futures.as_completed(futures):
         temp = future.result()
@@ -114,7 +110,7 @@ while numTrainSamp + numTestSamp != len(trainData):
 	[numTrainSamp, numTestSamp],
 	generator=torch.Generator().manual_seed(42))
 
-
+print('\t\t\t', len(tempset), classes, '\n')
 # calculate the train/validation split
 print("[INFO] generating the train/validation split...")
 numTrainSamples = int(len(trainData) * TRAIN_SPLIT)
@@ -167,10 +163,12 @@ for e in range(0, EPOCHS):
 	# loop over the training set
 	for (x, y) in trainDataLoader:
 		y = mlb.fit_transform(y)
+  
 		# send the input to the device
 		(x, y) = (x.to(device), torch.tensor(y).to(device))
 		# perform a forward pass and calculate the training loss
 		pred = model(x)
+		
 		loss = lossFn(pred, y)
 		# zero out the gradients, perform the backpropagation step,
 		# and update the weights
@@ -189,8 +187,9 @@ for e in range(0, EPOCHS):
 		model.eval()
 		# loop over the validation set
 		for (x, y) in valDataLoader:
+			y = mlb.fit_transform(y)
 			# send the input to the device
-			(x, y) = (x.to(device), y.to(device))
+			(x, y) = (x.to(device), torch.tensor(y).to(device))
 			# make the predictions and calculate the validation loss
 			pred = model(x)
 			totalValLoss += lossFn(pred, y)
@@ -236,8 +235,16 @@ with torch.no_grad():
 		pred = model(x)
 		preds.extend(pred.argmax(axis=1).cpu().numpy())
 # generate a classification report
-print(classification_report(testData.targets.cpu().numpy(),
-	np.array(preds), target_names=testData.classes))
+# print(classification_report(testData.targets.cpu().numpy(),
+# 	np.array(preds), target_names=testData.classes))
+
+modelFile = Path(os.getcwd()).parents[0]
+modelFile = os.path.join(modelFile, 'models', 'car_model_p1', 'car_model.pt')
+plotFile = Path(os.getcwd()).parents[0]
+plotFile = os.path.join(plotFile, 'models', 'car_model_p1', 'plot.png')
+
+os.mkdir(Path(modelFile).parents[1])
+os.mkdir(Path(plotFile).parents[0])
 
 plt.style.use("ggplot")
 plt.figure()
@@ -249,6 +256,6 @@ plt.title("Training Loss and Accuracy on Dataset")
 plt.xlabel("Epoch #")
 plt.ylabel("Loss/Accuracy")
 plt.legend(loc="lower left")
-plt.savefig(args["plot"])
+plt.savefig(plotFile)
 # serialize the model to disk
-torch.save(model, args["model"])
+torch.save(model, modelFile)
