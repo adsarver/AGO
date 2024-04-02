@@ -19,7 +19,7 @@ class Classifier(nn.Module):
         # x = o4
         self.fc1 = nn.Linear(256*125*125, 128) # 16 * 5 * 5 : conv2 output channels * x * x
         self.fc2 = nn.Linear(128, 84)
-        self.fc3 = nn.Linear(84, 54)
+        self.fc3 = nn.Linear(84, 2801)
 
     def forward(self, x):
         x = self.pool(F.relu(self.conv1(x.float())))

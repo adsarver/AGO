@@ -29,10 +29,9 @@ class CustomImageDataset(Dataset):
 		self.img_labels = pd.read_csv(annotations_file)
 		self.img_dir = img_dir
 		self.transform = transform
-		for j in range(len(self.img_labels.iloc)):
-			for i in self.img_labels.iloc[j, 1]:
-				print(i[:-8])
-				tempset.add(i[:-8])
+		for i in self.img_labels.iterrows():
+			tempset.add(i[1][0])
+		self.classes = len(tempset)
      
 	def __len__(self):
 		return len(self.img_labels)
@@ -110,7 +109,6 @@ while numTrainSamp + numTestSamp != len(trainData):
 	[numTrainSamp, numTestSamp],
 	generator=torch.Generator().manual_seed(42))
 
-print('\t\t\t', len(tempset), classes, '\n')
 # calculate the train/validation split
 print("[INFO] generating the train/validation split...")
 numTrainSamples = int(len(trainData) * TRAIN_SPLIT)
