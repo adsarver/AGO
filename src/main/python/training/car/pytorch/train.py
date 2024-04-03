@@ -37,10 +37,11 @@ class CustomImageDataset(Dataset):
 		return len(self.img_labels)
 
 	def __getitem__(self, idx):
-		img_path = os.path.join(self.img_dir, self.img_labels.iloc[idx, 1])
+		tup = tuple(self.img_labels.iloc[idx])
+		imgloc = tup[2]
+		label = tup[1][:-8]
+		img_path = os.path.join(self.img_dir, imgloc)
 		image = read_image(img_path)
-		label = self.img_labels.iloc[idx, 1][:-8]
-		tempset.add(label)
 		image = self.transform(image)
 
 		return image, label
@@ -48,12 +49,14 @@ class CustomImageDataset(Dataset):
 # MAX THREADS -- Change this to the number of workers you want to use for importing the dataset
 MAX_WORKERS = 12
 # define training hyperparameters
-INIT_LR = 1e-3
+INIT_LR = 1e-6
 BATCH_SIZE = 64
 EPOCHS = 300
 # define the train and val splits
 TRAIN_SPLIT = 0.9
 VAL_SPLIT = 1 - TRAIN_SPLIT
+IMG_DIMS = (256, 256)
+
 # set the device we will be using to train the model
 device = torch.device(0)
 
@@ -71,26 +74,30 @@ def getAnno(file: str):
 
 input_dir = os.path.join(os.getcwd(), 'exterior_sml', 'exterior')
 
-labels = dict()
+labels = []
 files = os.listdir(input_dir)
 
 with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-    futures = []
-    for file in files:
-        futures.append(executor.submit(getAnno, file))
-    for future in concurrent.futures.as_completed(futures):
-        temp = future.result()
-        labels.update({temp[0]: temp[1]})
-        
+	futures = []
+	for file in files:
+		futures.append(executor.submit(getAnno, file))
+	i = 0
+	for future in concurrent.futures.as_completed(futures):
+		temp = future.result()
+		labels.append((temp[0], temp[1]))
+		i += 1
+
+
 with open('exterior_sml/$annotations.csv', 'w', newline='') as file:
-    df = pd.DataFrame.from_dict(labels, orient='index')
-    df.to_csv(file)
-    print('[INFO] annotations saved to file')
+	labels = np.array(labels)
+	df = pd.DataFrame(labels)
+	df.to_csv(file)
+	print('[INFO] annotations saved to file')
 
 trainData = CustomImageDataset('exterior_sml/$annotations.csv', input_dir, 
 	transform=transforms.Compose([
 		transforms.ToPILImage(),
-		transforms.Resize((512,512)),
+		transforms.Resize(IMG_DIMS),
 		transforms.ToTensor(),
   		transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
 	]))
@@ -132,7 +139,7 @@ valSteps = len(valDataLoader.dataset)
 
 # initialize the LeNet model
 print("[INFO] initializing the LeNet model...")
-model = Classifier().cuda()
+model = Classifier(classes, IMG_DIMS).cuda()
 # initialize our optimizer and loss function
 opt = Adam(model.parameters(), lr=INIT_LR)
 lossFn = nn.NLLLoss()
