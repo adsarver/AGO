@@ -18,9 +18,9 @@ class Classifier(nn.Module):
         self.padding = padding
         self.stride = stride
         # Convolutional layers
-        self.conv1 = nn.Conv2d(3, 6, kernel_size=kernel_width)
-        self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
-        self.conv2 = nn.Conv2d(6, self.convout, kernel_size=kernel_width)
+        self.conv1 = nn.Conv2d(3, 6, kernel_size=kernel_width).cuda()
+        self.pool = nn.MaxPool2d(kernel_size=2, stride=2).cuda()
+        self.conv2 = nn.Conv2d(6, self.convout, kernel_size=kernel_width).cuda()
 
         # Fully connected layers
         # o1 = (image_width - kernel_width + 2*padding) / stride + 1
@@ -29,9 +29,9 @@ class Classifier(nn.Module):
         # o4 = o3 / 2
         # x = o4
         o_calc = self.o_calc()
-        self.fc1 = nn.Linear(self.convout*o_calc*o_calc, 128) # 16 * 5 * 5 : conv2 output channels * x * x
-        self.fc2 = nn.Linear(128, 256)
-        self.fc3 = nn.Linear(256, classes)
+        self.fc1 = nn.Linear(self.convout*o_calc*o_calc, 128).cuda() # 16 * 5 * 5 : conv2 output channels * x * x
+        self.fc2 = nn.Linear(128, 256).cuda()
+        self.fc3 = nn.Linear(256, classes).cuda()
 
     def forward(self, x):
         o_calc = self.o_calc()

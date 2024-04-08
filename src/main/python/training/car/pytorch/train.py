@@ -51,15 +51,15 @@ MAX_WORKERS = 12
 # define training hyperparameters
 INIT_LR = 1e-6
 BATCH_SIZE = 64
-EPOCHS = 300
+EPOCHS = 1000
 # define the train and val splits
 TRAIN_SPLIT = 0.9
 VAL_SPLIT = 1 - TRAIN_SPLIT
 IMG_DIMS = (256, 256)
 
 # set the device we will be using to train the model
-device = torch.device(0)
-
+device = torch.device("cuda")
+torch.cuda.set_device(0)
 # load the dataset
 print("[INFO] loading the dataset...")
 
@@ -97,9 +97,9 @@ with open('exterior_sml/$annotations.csv', 'w', newline='') as file:
 trainData = CustomImageDataset('exterior_sml/$annotations.csv', input_dir, 
 	transform=transforms.Compose([
 		transforms.ToPILImage(),
-		transforms.Resize(IMG_DIMS),
+		transforms.Resize(IMG_DIMS).cuda(),
 		transforms.ToTensor(),
-  		transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+  		transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)).cuda()
 	]))
 
 classes = trainData.classes
@@ -139,7 +139,7 @@ valSteps = len(valDataLoader.dataset)
 
 # initialize the LeNet model
 print("[INFO] initializing the LeNet model...")
-model = Classifier(classes, IMG_DIMS).cuda()
+model = Classifier(classes, IMG_DIMS).to(device)
 # initialize our optimizer and loss function
 opt = Adam(model.parameters(), lr=INIT_LR)
 lossFn = nn.NLLLoss()
@@ -174,7 +174,7 @@ for e in range(0, EPOCHS):
 		# perform a forward pass and calculate the training loss
 		pred = model(x)
 		
-		loss = lossFn(pred, y)
+		loss = lossFn(pred, y).to(device)
 		# zero out the gradients, perform the backpropagation step,
 		# and update the weights
 		opt.zero_grad()
@@ -218,7 +218,7 @@ for e in range(0, EPOCHS):
 		avgTrainLoss, trainCorrect))
 	print("Val loss: {:.6f}, Val accuracy: {:.4f}\n".format(
 		avgValLoss, valCorrect))
- 
+	print("Epoch time: {:.2f}s".format(time.time() - startTime))
 # finish measuring how long training took
 endTime = time.time()
 print("[INFO] total time taken to train the model: {:.2f}s".format(
