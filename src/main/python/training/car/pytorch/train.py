@@ -140,6 +140,7 @@ valSteps = len(valDataLoader.dataset)
 # initialize the LeNet model
 print("[INFO] initializing the LeNet model...")
 model = Classifier(classes, IMG_DIMS).to(device)
+model = nn.DataParallel(model)
 # initialize our optimizer and loss function
 opt = Adam(model.parameters(), lr=INIT_LR)
 lossFn = nn.NLLLoss()
