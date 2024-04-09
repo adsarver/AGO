@@ -47,7 +47,7 @@ class CustomImageDataset(Dataset):
 		return image, label
 
 # MAX THREADS -- Change this to the number of workers you want to use for importing the dataset
-MAX_WORKERS = 12
+MAX_WORKERS = 100
 # define training hyperparameters
 INIT_LR = 1e-6
 BATCH_SIZE = 64
