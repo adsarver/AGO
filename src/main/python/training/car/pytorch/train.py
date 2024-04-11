@@ -1,14 +1,14 @@
 import matplotlib
 matplotlib.use("Agg")
 from torchvision.io import read_image
-from classifier import Classifier
+from classifier import ResNet50 as ResNet
 import concurrent.futures
 from sklearn.metrics import classification_report
 from torch.utils.data import random_split
 from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
 import torchvision.transforms as transforms
-from torch.optim import Adam
+from torch.optim import RAdam
 from torch import nn
 import matplotlib.pyplot as plt
 import numpy as np
@@ -17,20 +17,21 @@ import torch
 import time
 import os
 import pandas as pd
-from sklearn.preprocessing import LabelEncoder
 from pathlib import Path
 
-mlb = LabelEncoder()
 tempset = set()
+torch.backends.cudnn.benchmark = True
+
 class CustomImageDataset(Dataset):
 	classes = 0
-
+	labels = dict()
 	def __init__(self, annotations_file, img_dir, transform=None):
 		self.img_labels = pd.read_csv(annotations_file)
 		self.img_dir = img_dir
 		self.transform = transform
 		for i in self.img_labels.iterrows():
-			tempset.add(i[1][0])
+			tempset.add(i[1][1])
+		self.labels = dict(zip(tempset, range(len(tempset))))
 		self.classes = len(tempset)
      
 	def __len__(self):
@@ -39,27 +40,31 @@ class CustomImageDataset(Dataset):
 	def __getitem__(self, idx):
 		tup = tuple(self.img_labels.iloc[idx])
 		imgloc = tup[2]
-		label = tup[1][:-8]
+		labelidx = self.labels[tup[1]]
 		img_path = os.path.join(self.img_dir, imgloc)
 		image = read_image(img_path)
 		image = self.transform(image)
 
-		return image, label
+		return image, labelidx
 
-# MAX THREADS -- Change this to the number of workers you want to use for importing the dataset
-MAX_WORKERS = 100
+	def getLabel(self, idx):
+		tup = tuple(self.img_labels.iloc[idx])
+		return tup[1]
+
+# MAX THREADS -- Change this to the number of workers you want to use for importing and loading the dataset
+MAX_WORKERS = 12
 # define training hyperparameters
-INIT_LR = 1e-6
+INIT_LR = 1e-4
 BATCH_SIZE = 64
-EPOCHS = 1000
+EPOCHS = 50
+DECAY = 1e-2
 # define the train and val splits
-TRAIN_SPLIT = 0.9
+TRAIN_SPLIT = 0.8
 VAL_SPLIT = 1 - TRAIN_SPLIT
-IMG_DIMS = (256, 256)
+ANNOTATIONS = 'exterior_sml/$annotations.csv'
 
 # set the device we will be using to train the model
 device = torch.device("cuda")
-torch.cuda.set_device(0)
 # load the dataset
 print("[INFO] loading the dataset...")
 
@@ -77,30 +82,36 @@ input_dir = os.path.join(os.getcwd(), 'exterior_sml', 'exterior')
 labels = []
 files = os.listdir(input_dir)
 
-with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
 	futures = []
-	for file in files:
+	for file in files[:999]:
 		futures.append(executor.submit(getAnno, file))
-	i = 0
 	for future in concurrent.futures.as_completed(futures):
 		temp = future.result()
 		labels.append((temp[0], temp[1]))
-		i += 1
 
 
-with open('exterior_sml/$annotations.csv', 'w', newline='') as file:
+with open(ANNOTATIONS, 'w', newline='') as file:
 	labels = np.array(labels)
 	df = pd.DataFrame(labels)
 	df.to_csv(file)
 	print('[INFO] annotations saved to file')
 
-trainData = CustomImageDataset('exterior_sml/$annotations.csv', input_dir, 
+data = CustomImageDataset(ANNOTATIONS, input_dir, 
 	transform=transforms.Compose([
-		transforms.ToPILImage(),
-		transforms.Resize(IMG_DIMS).cuda(),
-		transforms.ToTensor(),
-  		transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)).cuda()
-	]))
+	transforms.ToPILImage(),
+    transforms.ToTensor(),
+    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+]))
+
+trainData = CustomImageDataset(ANNOTATIONS, input_dir, 
+	transform=transforms.Compose([
+    transforms.RandomHorizontalFlip(),
+    transforms.Resize((128, 128)),
+	transforms.ToPILImage(),
+    transforms.ToTensor(),
+    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+]))
 
 classes = trainData.classes
 
@@ -112,12 +123,12 @@ numTestSamp = int(len(trainData) * 0.1)
 while numTrainSamp + numTestSamp != len(trainData):
 	numTrainSamp += 1
  
-(trainData, testData) = random_split(trainData,
+(data, testData) = random_split(trainData,
 	[numTrainSamp, numTestSamp],
 	generator=torch.Generator().manual_seed(42))
 
 # calculate the train/validation split
-print("[INFO] generating the train/validation split...")
+print("[INFO] generating the train/validation split of", len(trainData), "items...")
 numTrainSamples = int(len(trainData) * TRAIN_SPLIT)
 numValSamples = int(len(trainData) * VAL_SPLIT)
 
@@ -128,22 +139,26 @@ while numTrainSamples + numValSamples != len(trainData):
 	[numTrainSamples, numValSamples],
 	generator=torch.Generator().manual_seed(42))
 
+print("[INFO] EPOCHS set to", EPOCHS)
+print("[INFO] BATCH_SIZE set to", BATCH_SIZE)
+
 # initialize the train, validation, and test data loaders
 trainDataLoader = DataLoader(trainData, shuffle=True,
-	batch_size=BATCH_SIZE)
-valDataLoader = DataLoader(valData, batch_size=BATCH_SIZE)
-testDataLoader = DataLoader(testData, batch_size=BATCH_SIZE)
+	batch_size=BATCH_SIZE, num_workers=MAX_WORKERS, pin_memory=True)
+valDataLoader = DataLoader(valData, batch_size=BATCH_SIZE, num_workers=MAX_WORKERS, pin_memory=True)
+testDataLoader = DataLoader(testData, batch_size=BATCH_SIZE, num_workers=MAX_WORKERS, pin_memory=True)
 # calculate steps per epoch for training and validation set
 trainSteps = len(trainDataLoader.dataset)
 valSteps = len(valDataLoader.dataset) 
 
 # initialize the LeNet model
-print("[INFO] initializing the LeNet model...")
-model = Classifier(classes, IMG_DIMS).to(device)
-model = nn.DataParallel(model)
+print("[INFO] initializing the ResNet model...")
+model = ResNet(classes).to(device)
+model = nn.DataParallel(model).to(device)
 # initialize our optimizer and loss function
-opt = Adam(model.parameters(), lr=INIT_LR)
+opt = RAdam(model.parameters(), lr=INIT_LR, weight_decay=DECAY)
 lossFn = nn.NLLLoss()
+
 # initialize a dictionary to store training history
 H = {
 	"train_loss": [],
@@ -154,9 +169,10 @@ H = {
 # measure how long training is going to take
 print("[INFO] training the network...")
 startTime = time.time()
-
 # loop over our epochs
+looptimes = []
 for e in range(0, EPOCHS):
+	loopTime = time.time()
 	# set the model in training mode
 	model.train()
 	# initialize the total training and validation loss
@@ -168,14 +184,12 @@ for e in range(0, EPOCHS):
 	valCorrect = 0
 	# loop over the training set
 	for (x, y) in trainDataLoader:
-		y = mlb.fit_transform(y)
-  
-		# send the input to the device
-		(x, y) = (x.to(device), torch.tensor(y).to(device))
+		x = x.to(device)
+		y = y.to(device)
 		# perform a forward pass and calculate the training loss
 		pred = model(x)
-		
-		loss = lossFn(pred, y).to(device)
+		m = nn.LogSoftmax(dim=1)
+		loss = lossFn(m(pred), y)
 		# zero out the gradients, perform the backpropagation step,
 		# and update the weights
 		opt.zero_grad()
@@ -193,21 +207,24 @@ for e in range(0, EPOCHS):
 		model.eval()
 		# loop over the validation set
 		for (x, y) in valDataLoader:
-			y = mlb.fit_transform(y)
 			# send the input to the device
-			(x, y) = (x.to(device), torch.tensor(y).to(device))
+			(x, y) = (x.to(device), y.to(device))
 			# make the predictions and calculate the validation loss
 			pred = model(x)
-			totalValLoss += lossFn(pred, y)
+			m = nn.LogSoftmax(dim=1)
+			loss = lossFn(m(pred), y)
+			totalValLoss += loss
 			# calculate the number of correct predictions
 			valCorrect += (pred.argmax(1) == y).type(
 				torch.float).sum().item()
+   
 	# calculate the average training and validation loss
 	avgTrainLoss = totalTrainLoss / trainSteps
 	avgValLoss = totalValLoss / valSteps
 	# calculate the training and validation accuracy
-	trainCorrect = trainCorrect / len(trainDataLoader.dataset)
-	valCorrect = valCorrect / len(valDataLoader.dataset)
+	trainCorrect = trainCorrect / trainSteps
+	valCorrect = valCorrect / valSteps
+  
 	# update our training history
 	H["train_loss"].append(avgTrainLoss.cpu().detach().numpy())
 	H["train_acc"].append(trainCorrect)
@@ -219,7 +236,11 @@ for e in range(0, EPOCHS):
 		avgTrainLoss, trainCorrect))
 	print("Val loss: {:.6f}, Val accuracy: {:.4f}\n".format(
 		avgValLoss, valCorrect))
-	print("Epoch time: {:.2f}s".format(time.time() - startTime))
+	print("Loop time: {:.2f}s".format(time.time() - loopTime))
+	print("Total time: {:.2f}s".format(time.time() - startTime))
+	looptimes.append(time.time() - loopTime)
+
+	print("Estimated time remaining: {:.2f}s".format((sum(looptimes) / len(looptimes)) * (EPOCHS - e)))
 # finish measuring how long training took
 endTime = time.time()
 print("[INFO] total time taken to train the model: {:.2f}s".format(
@@ -233,24 +254,34 @@ with torch.no_grad():
 	
 	# initialize a list to store our predictions
 	preds = []
+	testCorrect = 0
 	# loop over the test set
 	for (x, y) in testDataLoader:
 		# send the input to the device
 		x = x.to(device)
+		y = y.to(device)
+  
 		# make the predictions and add them to the list
 		pred = model(x)
-		preds.extend(pred.argmax(axis=1).cpu().numpy())
+		predicted = torch.argmax(pred.data, 1)
+		testCorrect += (predicted == y).sum().item()
+  
 # generate a classification report
-# print(classification_report(testData.targets.cpu().numpy(),
-# 	np.array(preds), target_names=testData.classes))
+print("[INFO] Accuracy on {:d} classes: {:.2f}%".format(classes, (testCorrect / len(testDataLoader.dataset)) * 100))
 
 modelFile = Path(os.getcwd()).parents[0]
 modelFile = os.path.join(modelFile, 'models', 'car_model_p1', 'car_model.pt')
 plotFile = Path(os.getcwd()).parents[0]
 plotFile = os.path.join(plotFile, 'models', 'car_model_p1', 'plot.png')
+i = 1
 
-os.mkdir(Path(modelFile).parents[1])
-os.mkdir(Path(plotFile).parents[0])
+while os.path.exists(Path(modelFile).parents[0]):
+	i += 1 
+	modelFile = os.path.join(Path(os.getcwd()).parents[0], 'models', 'car_model_p{:d}'.format(i), 'car_model.pt')
+	plotFile = os.path.join(Path(os.getcwd()).parents[0], 'models', 'car_model_p{:d}'.format(i), 'plot.png')
+
+if not os.path.exists(Path(modelFile).parents[1]): os.mkdir(Path(modelFile).parents[1])
+os.mkdir(Path(modelFile).parents[0])
 
 plt.style.use("ggplot")
 plt.figure()
