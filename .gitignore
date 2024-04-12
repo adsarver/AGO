@@ -39,8 +39,9 @@ build/
 
 ### Dataset ###
 src/main/python/training/car/carscraper/dataset/
-src/main/python/training/car/pytorch/exterior_sml/
+src/main/python/training/car/pytorch/exterior/
 src/main/python/training/car/models/
+src/main/python/training/car/image_name_format/images
 
 ### Python ###
 src/main/python/training/__pycache__/

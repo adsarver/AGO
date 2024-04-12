@@ -3,7 +3,6 @@ matplotlib.use("Agg")
 from torchvision.io import read_image
 from classifier import ResNet50 as ResNet
 import concurrent.futures
-from sklearn.metrics import classification_report
 from torch.utils.data import random_split
 from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
@@ -12,7 +11,6 @@ from torch.optim import RAdam
 from torch import nn
 import matplotlib.pyplot as plt
 import numpy as np
-import argparse
 import torch
 import time
 import os
@@ -61,7 +59,7 @@ DECAY = 1e-2
 # define the train and val splits
 TRAIN_SPLIT = 0.8
 VAL_SPLIT = 1 - TRAIN_SPLIT
-ANNOTATIONS = 'exterior_sml/$annotations.csv'
+ANNOTATIONS = '$annotations.csv'
 
 # set the device we will be using to train the model
 device = torch.device("cuda")
@@ -77,7 +75,7 @@ def getAnno(file: str):
     curLabel = '_'.join(curLabel)
     return curLabel, file    
 
-input_dir = os.path.join(os.getcwd(), 'exterior_sml', 'exterior')
+input_dir = os.path.join(os.getcwd(), 'exterior')
 
 labels = []
 files = os.listdir(input_dir)
