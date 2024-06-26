@@ -42,6 +42,9 @@ src/main/python/training/car/carscraper/dataset/
 src/main/python/training/car/pytorch/exterior/
 src/main/python/training/car/models/
 src/main/python/training/car/image_name_format/images
+src/main/python/training/car/image_name_format/images_formatted
 
 ### Python ###
 src/main/python/training/__pycache__/
+src/main/python/training/car/pytorch/exterior.zip
+src/main/python/training/car/pytorch/__pycache__/classifier.cpython-310.pyc
