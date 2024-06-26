@@ -93,10 +93,10 @@ class TrDataset(Dataset):
 MAX_WORKERS = 6
 # define training hyperparameters
 INIT_LR = 1e-5
-BATCH_SIZE = 32
+BATCH_SIZE = 4
 EPOCHS = 400
 DECAY = 1e-4
-IMG_SIZE = 299
+IMG_SIZE = 518
 # define the train and val splits
 TRAIN_SPLIT = 0.7
 VAL_SPLIT = 1 - TRAIN_SPLIT
@@ -126,7 +126,7 @@ files = os.listdir(input_dir)
 
 with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
 	futures = []
-	for file in files[:999]:
+	for file in files[:99]:
 		if file.endswith('.jpg'):
 			futures.append(executor.submit(getAnno, file))
 	for future in concurrent.futures.as_completed(futures):
@@ -224,9 +224,9 @@ trainSteps = len(trainDataLoader.dataset)
 valSteps = len(valDataLoader.dataset) 
 
 # initialize the LeNet model
-print("[INFO] initializing the ResNet model...")
+print("[INFO] initializing the ImageNet model...")
 # model = models.inception_v3(weights=models.Inception_V3_Weights.DEFAULT).to(device)
-model = models.inception_v3(weights=models.Inception_V3_Weights.DEFAULT).to(device)
+model = model = torch.hub.load("facebookresearch/swag", model="vit_h14_in1k").to(device)
 model = nn.DataParallel(model)
 
 # initialize our optimizer and loss function
@@ -261,10 +261,9 @@ for e in range(0, EPOCHS):
 	for (x, y) in trainDataLoader:
 		(x, y) = (x.to(device), y.to(device))
 		# perform a forward pass and calculate the training loss
-		output, auxoutput = model(x)
+		output = model(x)
 		loss1 = lossFn(output, y)
-		loss2 = lossFn(auxoutput, y)
-		loss = loss1 + 0.4*loss2
+		loss = loss1
 		# zero out the gradients, perform the backpropagation step,
 		# and update the weights
 		opt.zero_grad()
